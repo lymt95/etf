@@ -1,0 +1,28 @@
+# Python
+venv/
+venv2/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# WorkBuddy
+.workbuddy/
+
+# 临时截图与调试产物
+screenshot_*.png
+test_*.png
+view_*.png
+debug_*.png
+
+# 运行产物（可重新生成，勿提交）
+*.log
+*.bak
+nav_cache.json
+docs/data/*.json.bak_*

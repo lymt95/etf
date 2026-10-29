@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETF 资金流向追踪 - 宽基ETF份额与资产规模变化</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3a4a 100%);
+            color: #fff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header p { font-size: 14px; color: #aab8c8; }
+        .header .update-time { font-size: 12px; color: #8a9ab8; margin-top: 4px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        /* KPI 卡片 */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: #fff;
+            padding: 18px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid #3498db;
+        }
+        .kpi-card.up { border-left-color: #e74c3c; }
+        .kpi-card.down { border-left-color: #27ae60; }
+        .kpi-card .label { font-size: 12px; color: #8a9ab8; margin-bottom: 6px; }
+        .kpi-card .value { font-size: 22px; font-weight: 700; color: #1a2332; }
+        .kpi-card .change { font-size: 12px; margin-top: 4px; }
+        .kpi-card .change.up { color: #e74c3c; }
+        .kpi-card .change.down { color: #27ae60; }
+
+        /* 控制面板 */
+        .control-panel {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+        .btn-group {
+            display: inline-flex;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-right: 1px solid #d0d7de;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:last-child { border-right: none; }
+        .btn:hover { background: #e8edf3; }
+        .btn.active {
+            background: #1a2332;
+            color: #fff;
+        }
+
+        /* 图表容器 */
+        .chart-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #1a2332;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chart-subtitle {
+            font-size: 12px;
+            color: #8a9ab8;
+            margin-bottom: 16px;
+        }
+        .chart-container { width: 100%; height: 420px; }
+        .chart-container.tall { height: 500px; }
+        .chart-container.short { height: 320px; }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .chart-controls-inline .btn-group {
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .chart-sub-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            padding-left: 4px;
+            border-left: 3px solid #3498db;
+        }
+        .small-multiples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .small-multiple {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+            background: #fff;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+        .small-multiple:hover {
+            border-color: #3498db;
+            box-shadow: 0 2px 6px rgba(52, 152, 219, 0.15);
+            transform: translateY(-1px);
+        }
+        .small-multiple-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1a2332;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .small-multiple-chart {
+            width: 100%;
+            height: 50px;
+        }
+        .small-multiple-change {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* 双栏布局 */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(680px, 1fr));
+            gap: 20px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 16px;
+        }
+
+        /* 数据表 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th {
+            background: #e8edf3;
+            color: #1a2332;
+            font-weight: 600;
+            padding: 10px 8px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .data-table td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        .data-table tr:hover { background: #f8f9fa; }
+        .data-table .sparkline-cell {
+            padding: 0 !important;
+            width: 140px;
+            height: 40px;
+        }
+        .data-table .target-name {
+            font-weight: 600;
+            text-align: left;
+            padding-left: 12px;
+        }
+        .data-table .target-name .color-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .change-up { color: #e74c3c; font-weight: 600; }
+        .change-down { color: #27ae60; font-weight: 600; }
+        .change-neutral { color: #8a9ab8; }
+
+        /* 分类标签 */
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .category-tab {
+            padding: 8px 16px;
+            border: 1px solid #d0d7de;
+            border-radius: 20px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .category-tab:hover { background: #e8edf3; }
+        .category-tab.active {
+            background: #1a2332;
+            color: #fff;
+            border-color: #1a2332;
+        }
+
+        /* 加载 & 错误 */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8a9ab8;
+            font-size: 16px;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e8edf3;
+            border-top: 3px solid #1a2332;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .error-msg {
+            background: #fde8e8;
+            color: #e74c3c;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: #8a9ab8;
+            font-size: 12px;
+        }
+        .legend-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #8a9ab8;
+            margin-left: 8px;
+        }
+        .legend-info .up { color: #e74c3c; }
+        .legend-info .down { color: #27ae60; }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 20px; }
+            .chart-container, .chart-container.tall { height: 300px; }
+            .data-table { font-size: 11px; }
+            .data-table th, .data-table td { padding: 4px; }
+        }
+
+        /* 导出按钮 */
+        .export-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .export-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #1a2332;
+            background: #fff;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .export-btn:hover {
+            background: #e8edf3;
+            border-color: #3498db;
+        }
+        .export-btn:active {
+            transform: scale(0.97);
+        }
+        .chart-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .chart-title-row .title-text {
+            flex: 1;
+            min-width: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📊 ETF 资金流向追踪</h1>
+    <p>宽基ETF每日份额与资产规模变化 | 透视"国家队"持仓动向</p>
+    <div class="update-time" id="updateTime">加载中...</div>
+</div>
+
+<div class="container">
+    <div id="loadingArea" class="loading">
+        <div class="loading-spinner"></div>
+        <div>正在加载ETF份额数据...</div>
+    </div>
+    <div id="errorArea" class="error-msg" style="display:none;"></div>
+
+    <!-- 顶部 KPI 卡片 -->
+    <div id="kpiRow" class="kpi-row" style="display:none;"></div>
+
+    <!-- 控制面板 -->
+    <div id="controlPanel" class="control-panel" style="display:none;">
+        <div class="control-group">
+            <span class="control-label">指标：</span>
+            <div class="btn-group" id="metricGroup">
+                <button class="btn active" data-metric="aum">资产规模</button>
+                <button class="btn" data-metric="shares">份额</button>
+            </div>
+        </div>
+        <div class="export-bar">
+            <button class="export-btn" id="exportCsvBtn" title="导出当前过滤后的全部数据为 CSV">
+                📥 导出 CSV
+            </button>
+            <button class="export-btn" id="exportAllPngBtn" title="把全部图表保存为图片压缩包">
+                🖼️ 导出全部图表
+            </button>
+        </div>
+    </div>
+
+    <!-- 分类筛选 -->
+    <div id="categoryArea" class="category-tabs" style="display:none;">
+        <div class="category-tab active" data-category="all">全部</div>
+        <div class="category-tab" data-category="宽基">宽基指数</div>
+        <div class="category-tab" data-category="科创">科创系列</div>
+        <div class="category-tab" data-category="商品">商品ETF</div>
+        <div class="category-tab" data-category="行业">行业主题</div>
+        <div class="category-tab" data-category="机器人">机器人</div>
+    </div>
+
+    <!-- 累计净流入排行（瀑布图替代） -->
+    <div id="flowSection" class="chart-section" style="display:none;">
+        <div class="chart-title-row">
+            <div class="title-text">
+                <div class="chart-title" id="flowTitle">
+                    累计净流入排行
+                    <span class="legend-info">
+                        <span class="up">▲ 流入(申购)</span>
+                        <span class="down">▼ 流出(赎回)</span>
+                    </span>
+                </div>
+                <div class="chart-subtitle" id="flowSubtitle"></div>
+            </div>
+            <button class="export-btn" data-export-chart="flow" title="保存为 PNG">🖼️ 图片</button>
+        </div>
+        <div class="chart-container" id="flowChart"></div>
+    </div>
+
+    <!-- 资产规模结构：仅保留强度热图 -->
+    <div id="mainChartSection" class="chart-section" style="display:none;">
+        <div class="chart-header">
+            <div>
+                <div class="chart-title" id="mainChartTitle">资产规模结构与走势</div>
+                <div class="chart-subtitle" id="mainChartSubtitle"></div>
+            </div>
+            <div class="chart-controls-inline">
+                <div class="btn-group" id="mainChartModeGroup" style="margin-right:8px;">
+                    <button class="btn active" data-mode="pct">占比(%)</button>
+                    <button class="btn" data-mode="abs">绝对值</button>
+                </div>
+                <div class="btn-group" id="mainPeriodGroup">
+                    <button class="btn active" data-period="day">按天</button>
+                    <button class="btn" data-period="week">按周</button>
+                    <button class="btn" data-period="month">按月</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 强度热图 -->
+        <div class="chart-sub-label">
+            🔥 强度热图 · 品类×时间 矩阵（颜色越深=规模越大）
+            <button class="export-btn" data-export-chart="heatmap" style="float:right;margin-left:auto;font-size:11px;padding:3px 8px;" title="保存为 PNG">🖼️ 图片</button>
+        </div>
+        <div class="chart-container tall" id="heatmapChart"></div>
+
+        <!-- 日变化贡献图 -->
+        <div class="chart-sub-label">
+            📈 每日净变化贡献 · Top 10 堆叠柱状
+            <button class="export-btn" data-export-chart="mainChange" style="float:right;margin-left:auto;font-size:11px;padding:3px 8px;" title="保存为 PNG">🖼️ 图片</button>
+        </div>
+        <div class="chart-container" id="mainChangeChart"></div>
+
+        <!-- 辅图：全标的 small multiples -->
+        <div class="chart-sub-label">📉 个体走势 · 小型多图（点击放大）</div>
+        <div class="small-multiples-grid" id="smallMultiplesGrid"></div>
+    </div>
+
+    <!-- 每日净变化瀑布图：按日期展示所有标的的净流入/流出 -->
+    <div id="waterfallSection" class="chart-section" style="display:none;">
+        <div class="chart-title-row">
+            <div class="title-text">
+                <div class="chart-title" id="waterfallTitle">每日净流入/流出瀑布图</div>
+                <div class="chart-subtitle" id="waterfallSubtitle">每个柱子代表一个交易日，颜色深度反映净流入/流出规模。点击柱子查看当日明细。</div>
+            </div>
+            <button class="export-btn" data-export-chart="waterfall" title="保存为 PNG">🖼️ 图片</button>
+        </div>
+        <div class="chart-container tall" id="waterfallChart"></div>
+    </div>
+
+    <!-- 详细数据表（带 Sparkline） -->
+    <div id="tableSection" class="chart-section" style="display:none;">
+        <div class="chart-title">详细数据表（点击列名排序）</div>
+        <div class="chart-subtitle">每行包含该标的的迷你趋势图(Sparkline)，便于一眼看出资金流向</div>
+        <div style="overflow-x:auto; max-height:600px; overflow-y:auto;">
+            <table class="data-table" id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 各标的详细图 -->
+    <div id="detailSection" class="chart-grid" style="display:none;"></div>
+</div>
+
+<div class="footer">
+    数据来源：上海证券交易所 & 深圳证券交易所 ETF份额日报 + 东方财富（用于计算AUM） | 每日 16:40 (北京时间) 自动更新<br>
+    同一标的不同基金公司的ETF份额已合并求和 | 涨=红 跌=绿（中国股市惯例） | 仅供研究参考
+</div>
+
+<script>
+// ============================================================
+// 标的分类配置
+// ============================================================
+const TARGET_CATEGORIES = {
+    "宽基": ["上证50", "沪深300", "中证500", "中证1000", "中证A500", "深证100", "国证2000", "创业板指"],
+    "科创": ["科创50", "科创100", "科创半导体", "科创芯片", "双创50"],
+    "商品": ["黄金", "白银"],
+    "行业": ["创新药", "有色金属", "光伏", "半导体", "芯片"],
+    "机器人": ["机器人"],
+};
+
+// 数据限制说明：哪些标的的份额数据非真实历史
+const TARGET_DATA_NOTES = {
+    "白银": "份额数据源限制：白银LOF(161226)不在交易所ETF份额日报中，本项目仅用历史净值反映白银价格波动（份额/AUM为估算值）",
+};
+
+const TARGET_COLORS = {
+    "上证50": "#e74c3c",
+    "沪深300": "#c0392b",
+    "中证500": "#e67e22",
+    "中证1000": "#f39c12",
+    "中证A500": "#d35400",
+    "深证100": "#e91e63",
+    "国证2000": "#ff9800",
+    "创业板指": "#9b59b6",
+    "科创50": "#3498db",
+    "科创100": "#2980b9",
+    "科创半导体": "#1abc9c",
+    "科创芯片": "#16a085",
+    "双创50": "#2ecc71",
+    "黄金": "#f1c40f",
+    "白银": "#95a5a6",
+    "机器人": "#5e35b1",
+    "创新药": "#8e44ad",
+    "有色金属": "#795548",
+    "光伏": "#ff5722",
+    "半导体": "#00bcd4",
+    "芯片": "#009688",
+};
+
+// 标的分类中文名
+const CATEGORY_LABEL = {
+    "all": "全部标的",
+    "宽基": "宽基指数",
+    "科创": "科创系列",
+    "商品": "商品ETF",
+    "行业": "行业主题",
+    "机器人": "机器人",
+};
+
+// ============================================================
+// 状态
+// ============================================================
+let rawData = null;
+let dates = [];
+let targets = [];
+let currentCategory = "all";
+let currentMetric = "aum";
+let currentPeriod = "day";      // 全局（用于瀑布图等）
+let currentMainPeriod = "day";  // 仅主图趋势对比使用
+let currentMainMode = "pct";    // 主图显示模式：pct=百分比, abs=绝对值
+let charts = {};
+let tableSortKey = 'cumulativeChange';
+let tableSortDir = 'desc';
+
+// ============================================================
+// 工具
+// ============================================================
+const METRIC_CONFIG = {
+    shares: { label: '份额', unit: '亿份', yAxisName: '亿份', short: '份额' },
+    aum:    { label: '资产规模', unit: '亿元', yAxisName: '亿元', short: 'AUM' },
+};
+
+function getMetricConfig() { return METRIC_CONFIG[currentMetric]; }
+
+function getDateRange() {
+    return dates;  // 默认返回全部日期
+}
+
+function getFilteredTargets() {
+    if (currentCategory === "all") return targets;
+    const catTargets = TARGET_CATEGORIES[currentCategory] || [];
+    return targets.filter(t => catTargets.includes(t));
+}
+
+// 获取标的时序数据
+function getTargetSeries(targetName, metric = 'aum') {
+    const result = [];
+    const range = getDateRange();
+    for (let i = 0; i < range.length; i++) {
+        const d = range[i];
+        const info = rawData.records[d][targetName];
+        const value = info ? info[metric] : null;
+        let prevValue = null;
+        if (i > 0) {
+            const prevInfo = rawData.records[range[i-1]][targetName];
+            if (prevInfo) prevValue = prevInfo[metric];
+        }
+        const change = (value !== null && prevValue !== null) ? value - prevValue : null;
+        const changePct = (value !== null && prevValue !== null && prevValue !== 0)
+            ? (change / prevValue * 100) : null;
+        result.push({ date: d, value, change, changePct });
+    }
+    return result;
+}
+
+// 按周/月聚合（取最后一个交易日的数据）
+function aggregateByPeriod(data, period) {
+    if (period === 'day') return data;
+    const groups = {};
+    for (const item of data) {
+        let key;
+        if (period === 'week') {
+            const dt = new Date(item.date);
+            const day = dt.getDay();
+            const diff = dt.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(dt.setDate(diff));
+            key = monday.toISOString().slice(0, 10);
+        } else if (period === 'month') {
+            key = item.date.slice(0, 7);
+        }
+        if (!groups[key] || item.date > groups[key].date) groups[key] = item;
+    }
+    return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ============================================================
+// 数据加载
+// ============================================================
+async function loadData() {
+    try {
+        const response = await fetch('./data/etf_shares.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        rawData = await response.json();
+        processData();
+        showUI();
+        renderAll();
+        document.getElementById('loadingArea').style.display = 'none';
+    } catch (e) {
+        document.getElementById('loadingArea').style.display = 'none';
+        const errEl = document.getElementById('errorArea');
+        errEl.style.display = 'block';
+        errEl.textContent = '数据加载失败: ' + e.message + '。请确保 docs/data/etf_shares.json 存在。';
+    }
+}
+
+function processData() {
+    const records = rawData.records;
+    dates = Object.keys(records).sort();
+    const targetSet = new Set();
+    for (const d of dates) {
+        for (const t of Object.keys(records[d])) {
+            targetSet.add(t);
+        }
+    }
+    targets = Array.from(targetSet).sort();
+}
+
+// ============================================================
+// 统一 resize 处理器：避免重复添加监听器造成内存泄漏
+// ============================================================
+function resizeAllCharts() {
+    if (charts.flow) charts.flow.resize();
+    if (charts.heatmap) charts.heatmap.resize();
+    if (charts.waterfall) charts.waterfall.resize();
+    if (charts.mainChange) charts.mainChange.resize();
+    Object.values(charts.smallMultiples || {}).forEach(c => c && c.resize());
+    Object.keys(charts).filter(k => k.startsWith('detail_')).forEach(k => {
+        if (charts[k]) charts[k].resize();
+    });
+}
+let _resizeHandler = null;
+function ensureResizeHandler() {
+    if (_resizeHandler) {
+        window.removeEventListener('resize', _resizeHandler);
+    }
+    _resizeHandler = debounce(resizeAllCharts, 100);
+    window.addEventListener('resize', _resizeHandler);
+}
+function debounce(fn, delay) {
+    let timer = null;
+    return function(...args) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+function showUI() {
+    ['kpiRow', 'controlPanel', 'categoryArea', 'flowSection', 'mainChartSection',
+     'waterfallSection', 'tableSection', 'detailSection'].forEach(id => {
+        document.getElementById(id).style.display = '';
+    });
+    document.getElementById('updateTime').textContent = '最后更新: ' + (rawData.last_update || '未知');
+    initControls();
+}
+
+// ============================================================
+// 控件
+// ============================================================
+function initControls() {
+    document.querySelectorAll('#metricGroup .btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#metricGroup .btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMetric = btn.dataset.metric;
+            renderAll();
+        });
+    });
+
+    document.querySelectorAll('#mainPeriodGroup .btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#mainPeriodGroup .btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMainPeriod = btn.dataset.period;
+            renderMainChart();
+        });
+    });
+
+    document.querySelectorAll('#mainChartModeGroup .btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#mainChartModeGroup .btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMainMode = btn.dataset.mode;
+            renderMainChart();
+        });
+    });
+
+    document.querySelectorAll('.category-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentCategory = tab.dataset.category;
+            renderAll();
+        });
+    });
+
+    // 导出按钮绑定
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCSV);
+    const exportAllPngBtn = document.getElementById('exportAllPngBtn');
+    if (exportAllPngBtn) exportAllPngBtn.addEventListener('click', exportAllCharts);
+    document.querySelectorAll('[data-export-chart]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            exportChartImage(btn.dataset.exportChart);
+        });
+    });
+}
+
+// ============================================================
+// KPI 卡片
+// ============================================================
+function renderKPIs() {
+    const row = document.getElementById('kpiRow');
+    row.innerHTML = '';
+
+    const range = getDateRange();
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    // 空数据保护
+    if (range.length === 0 || filteredTargets.length === 0) {
+        row.innerHTML = `<div class="kpi-card"><div class="label">无数据</div><div class="value">--</div></div>`;
+        return;
+    }
+
+    // KPI 1: 总资产规模
+    let totalLatest = 0, totalPrev = 0;
+    for (const t of filteredTargets) {
+        const latest = rawData.records[range[range.length-1]]?.[t];
+        if (latest) totalLatest += latest[currentMetric] || 0;
+        if (range.length > 1) {
+            const prev = rawData.records[range[0]]?.[t];
+            if (prev) totalPrev += prev[currentMetric] || 0;
+        }
+    }
+    const totalChange = totalLatest - totalPrev;
+    const totalChangePct = totalPrev !== 0 ? (totalChange / totalPrev * 100) : 0;
+
+    // KPI 2: 净流入（最近一个交易日）
+    let dailyInflow = 0, dailyOutflow = 0;
+    if (range.length >= 2) {
+        const lastDate = range[range.length-1];
+        const prevDate = range[range.length-2];
+        for (const t of filteredTargets) {
+            const last = rawData.records[lastDate]?.[t];
+            const prev = rawData.records[prevDate]?.[t];
+            if (last && prev) {
+                const chg = last[currentMetric] - prev[currentMetric];
+                if (chg > 0) dailyInflow += chg;
+                else dailyOutflow += Math.abs(chg);
+            }
+        }
+    }
+    const netFlow = dailyInflow - dailyOutflow;
+
+    // KPI 3: 期内累计变化
+    const periodLabel = '全部时间';
+    const periodStart = range[0];
+    const periodEnd = range[range.length-1];
+
+    row.innerHTML = `
+        <div class="kpi-card ${totalChange > 0 ? 'up' : (totalChange < 0 ? 'down' : '')}">
+            <div class="label">总${cfg.label}（${CATEGORY_LABEL[currentCategory]}）</div>
+            <div class="value">${totalLatest.toFixed(2)} ${cfg.unit}</div>
+            <div class="change ${totalChange > 0 ? 'up' : (totalChange < 0 ? 'down' : '')}">
+                ${totalChange >= 0 ? '+' : ''}${totalChange.toFixed(2)} ${cfg.unit} (${totalChangePct >= 0 ? '+' : ''}${totalChangePct.toFixed(2)}%)
+            </div>
+            <div class="change">${periodLabel} (${periodStart} ~ ${periodEnd})</div>
+        </div>
+        <div class="kpi-card ${netFlow > 0 ? 'up' : (netFlow < 0 ? 'down' : '')}">
+            <div class="label">最近交易日 净流入</div>
+            <div class="value">${netFlow >= 0 ? '+' : ''}${netFlow.toFixed(2)} ${cfg.unit}</div>
+            <div class="change">流入 ${dailyInflow.toFixed(2)} | 流出 ${dailyOutflow.toFixed(2)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="label">覆盖标的数</div>
+            <div class="value">${filteredTargets.length}</div>
+            <div class="change">交易日: ${range.length} 天</div>
+        </div>
+        <div class="kpi-card">
+            <div class="label">${currentPeriod === 'day' ? '日' : (currentPeriod === 'week' ? '周' : '月')}均${cfg.short}变化</div>
+            <div class="value">${(totalChange / Math.max(1, range.length - 1)).toFixed(4)}</div>
+            <div class="change">${cfg.unit}/${currentPeriod === 'day' ? '日' : (currentPeriod === 'week' ? '周' : '月')}</div>
+        </div>
+    `;
+}
+
+// ============================================================
+// 累计净流入排行
+// ============================================================
+function renderFlowRanking() {
+    if (charts.flow) charts.flow.dispose();
+    charts.flow = echarts.init(document.getElementById('flowChart'));
+
+    const range = getDateRange();
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    // 空数据保护
+    if (range.length < 2 || filteredTargets.length === 0) {
+        charts.flow.setOption({
+            title: { text: '数据不足', left: 'center', top: 'middle', textStyle: { color: '#8a9ab8' } },
+        }, true);
+        return;
+    }
+
+    // 计算每个标的的累计净变化
+    const cumulative = [];
+    for (const t of filteredTargets) {
+        const start = rawData.records[range[0]]?.[t];
+        const end = rawData.records[range[range.length-1]]?.[t];
+        if (!start || !end) continue;
+        const startVal = start[currentMetric];
+        const endVal = end[currentMetric];
+        if (startVal === null || startVal === undefined) continue;
+        if (endVal === null || endVal === undefined) continue;
+        const change = endVal - startVal;
+        const changePct = startVal !== 0 ? (change / startVal) * 100 : 0;
+        cumulative.push({ target: t, change, startVal, endVal, changePct });
+    }
+    cumulative.sort((a, b) => b.change - a.change);
+
+    // 标题根据指标切换文案
+    let flowTitle;
+    let flowLabel = `累计变化(${cfg.unit})`;
+    if (currentMetric === 'shares') {
+        flowTitle = '累计份额变化排行';
+    } else {
+        flowTitle = '累计资产规模变化排行';
+    }
+    document.getElementById('flowTitle').textContent = flowTitle;
+    document.getElementById('flowSubtitle').textContent =
+        `区间: ${range[0]} ~ ${range[range.length-1]} | 指标: ${cfg.label} | 共 ${cumulative.length} 个标的`;
+
+    if (cumulative.length === 0) {
+        charts.flow.setOption({
+            title: { text: '当前筛选下无有效数据', left: 'center', top: 'middle', textStyle: { color: '#8a9ab8' } },
+        }, true);
+        return;
+    }
+
+    const targetNames = cumulative.map(c => c.target);
+    const values = cumulative.map(c => c.change);
+
+    charts.flow.setOption({
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+                // 反转索引：yAxis data 是 reverse 的，dataIndex=0 对应 cumulative 末尾
+                const idx = params[0].dataIndex;
+                const c = cumulative[cumulative.length - 1 - idx];
+                const sign = c.change > 0 ? '+' : '';
+                const colorMain = c.change > 0 ? '#e74c3c' : '#27ae60';
+                const valueLine = `<b style="color:${colorMain}">${sign}${c.change.toFixed(2)} ${cfg.unit}</b>`;
+                const changeLine = `${c.startVal.toFixed(2)} → ${c.endVal.toFixed(2)} ${cfg.unit}`;
+                return `<b>${c.target}</b><br>
+                    区间: ${changeLine}<br>
+                    累计变化: ${valueLine}<br>
+                    变化率: ${sign}${c.changePct.toFixed(2)}%`;
+            }
+        },
+        grid: { left: 90, right: 30, top: 20, bottom: 30 },
+        xAxis: {
+            type: 'value',
+            name: flowLabel,
+            nameTextStyle: { fontSize: 11 },
+            axisLabel: { fontSize: 10 },
+        },
+        yAxis: {
+            type: 'category',
+            data: targetNames.slice().reverse(),
+            axisLabel: {
+                fontSize: 11,
+                formatter: v => {
+                    const color = TARGET_COLORS[v] || '#333';
+                    return `{${v.replace(/[^a-zA-Z0-9]/g, '_')}|${v}}`;
+                },
+                rich: Object.fromEntries(
+                    Object.entries(TARGET_COLORS).map(([k, v]) => [k.replace(/[^a-zA-Z0-9]/g, '_'), { color: v, fontWeight: 600 }])
+                ),
+            },
+        },
+        series: [{
+            type: 'bar',
+            data: values.slice().reverse().map((v, i, arr) => {
+                // 根据反转后位置反查 cumulative 原始条目
+                const originalIdx = arr.length - 1 - i;
+                const originalChange = cumulative[originalIdx].change;
+                // 颜色按原始 change 符号判断（更稳健）
+                return {
+                    value: v,
+                    itemStyle: { color: originalChange > 0 ? '#e74c3c' : (originalChange < 0 ? '#27ae60' : '#999') }
+                };
+            }),
+            barMaxWidth: 18,
+            label: {
+                show: true,
+                position: function(p) { return p.value >= 0 ? 'right' : 'left'; },
+                formatter: p => {
+                    const v = p.value;
+                    return (v > 0 ? '+' : '') + v.toFixed(2);
+                },
+                fontSize: 10,
+                color: '#333',
+            },
+        }],
+    }, true);
+}
+
+// ============================================================
+// 资产规模结构与走势：仅保留强度热图
+// ============================================================
+function renderMainChart() {
+    const filteredTargets = getFilteredTargets();
+    const range = getDateRange();
+    const cfg = getMetricConfig();
+    const isPct = currentMainMode === 'pct';
+    const periodLabel = currentMainPeriod === 'day' ? '按天' : (currentMainPeriod === 'week' ? '按周' : '按月');
+    const modeLabel = isPct ? '占比(%)' : '绝对值';
+
+    document.getElementById('mainChartSubtitle').textContent =
+        `强度热图 | ${periodLabel} | ${modeLabel} | ${cfg.label} | ${range[0]} ~ ${range[range.length-1]}`;
+
+    // 计算每个标的的"代表值"用于排名（用最新日期的值）
+    const targetLatestValue = {};
+    for (const t of filteredTargets) {
+        const series = getTargetSeries(t, currentMetric);
+        const lastValid = series.filter(s => s.value !== null).slice(-1)[0];
+        targetLatestValue[t] = lastValid ? lastValid.value : 0;
+    }
+
+    // 渲染热图
+    renderHeatmapChart(filteredTargets, targetLatestValue, cfg);
+
+    // 日变化贡献图
+    if (charts.mainChange) charts.mainChange.dispose();
+    charts.mainChange = echarts.init(document.getElementById('mainChangeChart'));
+    const sorted = filteredTargets.slice().sort((a, b) => (targetLatestValue[b] || 0) - (targetLatestValue[a] || 0));
+    const top10 = sorted.slice(0, 10);
+    const others = sorted.slice(10);
+    let xData = [];
+    if (top10.length > 0) {
+        const data = aggregateByPeriod(getTargetSeries(top10[0], currentMetric), currentMainPeriod);
+        xData = data.map(d => d.date);
+    }
+    renderMainChangeChart(top10, others, xData, cfg);
+
+    // 辅图：small multiples
+    renderSmallMultiples(filteredTargets, targetLatestValue, cfg);
+
+    // 使用统一的resize处理器（防抖）
+    ensureResizeHandler();
+}
+
+// ============================================================
+// 强度热图（品类×时间 矩阵）
+// 增强点：
+// 1. 行高自适：品类少→行高，品类多→行小（动态计算）
+// 2. 占比模式按行归一（每个品类在期间内取最大值作为 100%），让“相对热度”可看
+// 3. 绝对值模式用浅黄→深红渐变，更贴近金融视觉习惯
+// 4. 单元格内显示数值：占比显示%  /  绝对值显示额度（仅在有足够空间时）
+// 5. visualMap 更紧凑，带上单位
+// 6. Y 轴右侧附上首末变化 %小条，让冷热趋势一眼可看
+// ============================================================
+function renderHeatmapChart(filteredTargets, targetLatestValue, cfg) {
+    if (charts.heatmap) charts.heatmap.dispose();
+
+    const isPct = currentMainMode === 'pct';
+
+    // 按最新值降序排序品类
+    const sorted = filteredTargets.slice().sort((a, b) => (targetLatestValue[b] || 0) - (targetLatestValue[a] || 0));
+    // echarts Y 轴从下到上，反转使大值在底部
+    const yCategories = sorted.slice().reverse();
+
+    // 动态图表高度（品类越多，图表越高，避免标签重叠）
+    const rowHeight = sorted.length <= 6 ? 36 : (sorted.length <= 12 ? 26 : (sorted.length <= 20 ? 22 : 18));
+    const chartHeight = Math.min(900, Math.max(360, sorted.length * rowHeight + 100));
+    const heatmapDom = document.getElementById('heatmapChart');
+    heatmapDom.style.height = chartHeight + 'px';
+    charts.heatmap = echarts.init(heatmapDom);
+
+    // X 轴：聚合后的日期
+    let xData = [];
+    if (sorted.length > 0) {
+        const data = aggregateByPeriod(getTargetSeries(sorted[0], currentMetric), currentMainPeriod);
+        xData = data.map(d => d.date);
+    }
+
+    // 对每个品类计算【首值、末值、期内最大】
+    const rowStats = {};
+    for (const t of sorted) {
+        const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+        const validValues = data.map(d => d.value).filter(v => v !== null && v !== undefined);
+        const first = validValues[0] || 0;
+        const last = validValues[validValues.length - 1] || 0;
+        const max = validValues.length > 0 ? Math.max(...validValues) : 0;
+        rowStats[t] = { first, last, max, changePct: first > 0 ? ((last - first) / first * 100) : 0 };
+    }
+
+    // 构建三元组数据 [xIndex, yIndex, value, rawValue]
+    const heatData = [];
+    if (isPct) {
+        // 占比模式：值 = 该品类当日规模 / 当日总规模 × 100（反映结构占比）
+        // 提前计算每日总计
+        const dailyTotal = xData.map((_, xi) => {
+            let s = 0;
+            for (const t of sorted) {
+                const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+                s += (data[xi]?.value || 0);
+            }
+            return s;
+        });
+        for (let yi = 0; yi < yCategories.length; yi++) {
+            const t = yCategories[yi];
+            const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+            for (let xi = 0; xi < xData.length; xi++) {
+                const v = data[xi]?.value;
+                if (v === null || v === undefined) continue;
+                const total = dailyTotal[xi] || 0;
+                const ratio = total > 0 ? +(v / total * 100).toFixed(2) : 0;
+                heatData.push([xi, yi, ratio, v]);
+            }
+        }
+    } else {
+        // 绝对值模式：原值
+        for (let yi = 0; yi < yCategories.length; yi++) {
+            const t = yCategories[yi];
+            const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+            for (let xi = 0; xi < xData.length; xi++) {
+                const v = data[xi]?.value;
+                if (v === null || v === undefined) continue;
+                heatData.push([xi, yi, +v.toFixed(2), v]);
+            }
+        }
+    }
+
+    // 占比模式：仅 Top 5 重点品类着色，其他品类 value 设为 0（映射到色阶起始位＝最浅色）
+    // 视觉上与绝对值“前 5 重点 + 其他浅色”一致
+    const TOP_N_FOR_COLOR = 5;
+    const top5Set = new Set(sorted.slice(0, TOP_N_FOR_COLOR));
+    if (isPct) {
+        for (const d of heatData) {
+            const t = yCategories[d[1]];
+            if (!top5Set.has(t)) {
+                d[2] = 0;
+            }
+        }
+    }
+
+    // 计算 visualMap 范围
+    let vMin = 0, vMax = 0;
+    if (isPct) {
+        // 占比模式：vMax 取 Top 5 中的最大值（保证非 Top 5 始终位于最浅色区段）
+        const top5Values = heatData
+            .filter(d => top5Set.has(yCategories[d[1]]))
+            .map(d => d[2]);
+        vMax = top5Values.length > 0 ? Math.max(...top5Values) : 100;
+    } else {
+        const values = heatData.map(d => d[2]);
+        vMax = values.length > 0 ? Math.max(...values) : 100;
+    }
+
+    // 动态行高（根据品类数压缩行间距）
+    const _rowHeight = rowHeight; // 已在上面使用，此处保留以兼容下方代码
+
+    // 是否显示数值标签
+    const showLabels = heatData.length <= 800;
+
+    // 颜色档：占比与绝对值统一使用同一套"浅黄→深红"渐变，确保视觉一致
+    const colorRange = ['#fff7ec', '#fee8c8', '#fdd49e', '#fdbb84', '#fc8d59', '#d7301f', '#7f0000'];
+
+    charts.heatmap.setOption({
+        tooltip: {
+            position: 'top',
+            backgroundColor: 'rgba(50,50,50,0.95)',
+            borderColor: '#333',
+            textStyle: { color: '#fff', fontSize: 12 },
+            formatter: function(params) {
+                const [xi, yi, displayV, rawV] = params.value;
+                const t = yCategories[yi];
+                const date = xData[xi];
+                const stat = rowStats[t];
+                const changeColor = stat.changePct > 0 ? '#ff6b6b' : (stat.changePct < 0 ? '#51cf66' : '#aaa');
+                const changeSign = stat.changePct > 0 ? '+' : '';
+                let html = `<b style="font-size:13px;">${t}</b> · <span style="color:#ccc;">${date}</span><br>`;
+                if (isPct) {
+                    html += `相对热度: <b>${displayV.toFixed(1)}%</b><br>`;
+                    html += `规模: <b>${rawV.toFixed(2)} ${cfg.unit}</b><br>`;
+                } else {
+                    html += `规模: <b>${rawV.toFixed(2)} ${cfg.unit}</b><br>`;
+                }
+                html += `<hr style="margin:4px 0;border:none;border-top:1px solid #555;">`;
+                html += `期内首值: ${stat.first.toFixed(2)} → 末值: <b>${stat.last.toFixed(2)}</b><br>`;
+                html += `期内变化: <span style="color:${changeColor};font-weight:600;">${changeSign}${stat.changePct.toFixed(2)}%</span>`;
+                return html;
+            }
+        },
+        grid: { left: 110, right: 80, top: 30, bottom: 80, containLabel: false },
+        xAxis: {
+            type: 'category',
+            data: xData,
+            axisLabel: {
+                fontSize: 9,
+                formatter: v => v.length === 7 ? v : v.substring(5),
+                rotate: xData.length > 20 ? 45 : 0,
+                interval: xData.length > 30 ? Math.floor(xData.length / 15) : 0,
+            },
+            splitArea: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+        },
+        yAxis: {
+            type: 'category',
+            data: yCategories,
+            axisLabel: {
+                fontSize: sorted.length > 12 ? 9 : 11,
+                color: '#333',
+                interval: 0,
+                rotate: 0,
+                formatter: function(value) {
+                    // 品类多时简化标签
+                    if (sorted.length > 15 && value.length > 5) return value.substring(0, 5) + '…';
+                    return value.length > 8 ? value.substring(0, 8) + '…' : value;
+                },
+            },
+            splitArea: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+        },
+        visualMap: {
+            min: vMin,
+            max: vMax,
+            calculable: true,
+            orient: 'horizontal',
+            left: 'center',
+            bottom: 5,
+            itemHeight: 100,
+            itemWidth: 12,
+            textStyle: { fontSize: 10, color: '#666' },
+            text: isPct ? ['热度高', '热度低'] : ['规模大', '规模小'],
+            inRange: { color: colorRange },
+        },
+        dataZoom: [
+            {
+                type: 'slider',
+                xAxisIndex: 0,
+                height: 16,
+                bottom: 35,
+                showDetail: false,
+                fillerColor: 'rgba(231, 76, 60, 0.3)',
+                borderColor: '#e74c3c',
+                handleStyle: { color: '#e74c3c' },
+                textStyle: { color: '#666', fontSize: 10 },
+            },
+            { type: 'inside', xAxisIndex: 0 },
+        ],
+        series: [{
+            name: cfg.label,
+            type: 'heatmap',
+            data: heatData,
+            label: {
+                show: showLabels,
+                formatter: function(p) {
+                    const [, , displayV] = p.value;
+                    if (isPct) {
+                        return displayV >= 50 ? displayV.toFixed(0) + '%' : '';
+                    } else {
+                        if (displayV >= 1000) return (displayV / 1000).toFixed(1) + 'k';
+                        return displayV >= 100 ? displayV.toFixed(0) : '';
+                    }
+                },
+                fontSize: rowHeight > 20 ? 10 : 8,
+                color: '#fff',
+                textBorderColor: 'rgba(0,0,0,0.3)',
+                textBorderWidth: 1,
+            },
+            itemStyle: { borderRadius: 2, borderColor: '#fff', borderWidth: 1 },
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 12,
+                    shadowColor: 'rgba(0,0,0,0.5)',
+                    borderColor: '#1a2332',
+                    borderWidth: 2,
+                },
+            },
+        }],
+    }, true);
+}
+
+// 渲染日变化贡献堆叠柱状图
+function renderMainChangeChart(top10, others, xData, cfg) {
+    // 计算每个标的每日的变化量
+    const changeSeries = top10.map(t => {
+        const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+        const changes = data.map((d, i) => {
+            if (i === 0) return 0;
+            const prev = data[i - 1].value || 0;
+            const cur = d.value || 0;
+            return cur - prev;
+        });
+        return {
+            name: t,
+            type: 'bar',
+            stack: 'change',
+            data: changes,
+            itemStyle: { color: TARGET_COLORS[t] || '#999' },
+            barMaxWidth: 14,
+            emphasis: { focus: 'series' },
+        };
+    });
+
+    // 其他标的汇总
+    let otherChangeSeries = null;
+    if (others.length > 0) {
+        otherChangeSeries = {
+            name: '其他',
+            type: 'bar',
+            stack: 'change',
+            data: xData.map((_, i) => {
+                let sum = 0;
+                for (const t of others) {
+                    const data = aggregateByPeriod(getTargetSeries(t, currentMetric), currentMainPeriod);
+                    if (i === 0) continue;
+                    const prev = data[i - 1]?.value || 0;
+                    const cur = data[i]?.value || 0;
+                    sum += cur - prev;
+                }
+                return sum;
+            }),
+            itemStyle: { color: '#bdc3c7' },
+            barMaxWidth: 14,
+        };
+    }
+
+    const allChangeSeries = otherChangeSeries ? [...changeSeries, otherChangeSeries] : changeSeries;
+
+    charts.mainChange.setOption({
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+                let html = `<b>${params[0].axisValue}</b><br>`;
+                let total = 0;
+                params.forEach(p => { if (p.value) total += p.value; });
+                const color = total > 0 ? '#e74c3c' : '#27ae60';
+                const sign = total > 0 ? '+' : '';
+                html += `<span style="color:${color}">合计净变化: <b>${sign}${total.toFixed(2)} ${cfg.unit}</b></span><br>`;
+                html += `<div style="max-height:250px;overflow-y:auto;margin-top:4px;">`;
+                params.slice().reverse().forEach(p => {
+                    if (p.value !== null && p.value !== undefined && p.value !== 0) {
+                        const c = p.value > 0 ? '#e74c3c' : '#27ae60';
+                        const s = p.value > 0 ? '+' : '';
+                        html += `${p.marker} ${p.seriesName}: <span style="color:${c}">${s}${p.value.toFixed(2)}</span><br>`;
+                    }
+                });
+                html += `</div>`;
+                return html;
+            }
+        },
+        legend: {
+            type: 'scroll',
+            bottom: 0,
+            textStyle: { fontSize: 10 },
+            data: allChangeSeries.map(s => s.name),
+        },
+        grid: { left: 80, right: 30, top: 20, bottom: 60 },
+        xAxis: {
+            type: 'category',
+            data: xData,
+            axisLabel: { fontSize: 10, formatter: v => v.length === 7 ? v : v.substring(5) },
+        },
+        yAxis: {
+            type: 'value',
+            name: `净变化(${cfg.unit})`,
+            nameTextStyle: { fontSize: 11 },
+            axisLabel: { fontSize: 10 },
+        },
+        dataZoom: [
+            { type: 'inside' },
+            { type: 'slider', height: 18, bottom: 25, textStyle: { color: '#666', fontSize: 10 } },
+        ],
+        series: allChangeSeries,
+    }, true);
+}
+
+// 渲染小型多图网格
+function renderSmallMultiples(targets, latestValues, cfg) {
+    const grid = document.getElementById('smallMultiplesGrid');
+    grid.innerHTML = '';
+    charts.smallMultiples = charts.smallMultiples || {};
+
+    // 清理旧实例
+    Object.keys(charts.smallMultiples).forEach(k => {
+        if (!targets.includes(k)) {
+            charts.smallMultiples[k].dispose();
+            delete charts.smallMultiples[k];
+        }
+    });
+
+    // 按最新值降序排序
+    const sorted = targets.slice().sort((a, b) => (latestValues[b] || 0) - (latestValues[a] || 0));
+
+    for (const t of sorted) {
+        const card = document.createElement('div');
+        card.className = 'small-multiple';
+        const series = getTargetSeries(t, currentMetric);
+        const data = aggregateByPeriod(series, currentMainPeriod);
+        const validData = data.filter(d => d.value !== null);
+        const first = validData[0]?.value || 0;
+        const last = validData[validData.length - 1]?.value || 0;
+        const change = last - first;
+        const changePct = first !== 0 ? (change / first) * 100 : 0;
+        const changeColor = change > 0 ? '#e74c3c' : (change < 0 ? '#27ae60' : '#999');
+        const sign = change > 0 ? '+' : '';
+        const color = TARGET_COLORS[t] || '#999';
+
+        card.innerHTML = `
+            <div class="small-multiple-title">
+                <span style="color:${color}">● ${t}</span>
+                <span class="small-multiple-change" style="color:${changeColor}">${sign}${changePct.toFixed(2)}%</span>
+            </div>
+            <div class="small-multiple-chart" id="sm_${t.replace(/[^a-zA-Z0-9]/g, '_')}"></div>
+            <div style="font-size:10px;color:#8a9ab8;margin-top:2px;">
+                ${first.toFixed(0)} → ${last.toFixed(0)} ${cfg.unit}
+            </div>
+        `;
+        grid.appendChild(card);
+
+        // 用 nextTick 渲染（等 DOM 插入）
+        const chartId = `sm_${t.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        setTimeout(() => {
+            const dom = document.getElementById(chartId);
+            if (!dom) return;
+            if (charts.smallMultiples[t]) charts.smallMultiples[t].dispose();
+            const c = echarts.init(dom);
+            charts.smallMultiples[t] = c;
+            c.setOption({
+                grid: { left: 0, right: 0, top: 2, bottom: 0 },
+                xAxis: { type: 'category', show: false, data: data.map(d => d.date), boundaryGap: false },
+                yAxis: { type: 'value', show: false, scale: true },
+                tooltip: { show: false },
+                series: [{
+                    type: 'line',
+                    data: data.map(d => d.value),
+                    smooth: true,
+                    symbol: 'none',
+                    lineStyle: { width: 1.5, color: color },
+                    areaStyle: {
+                        color: {
+                            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: color + '66' },
+                                { offset: 1, color: color + '11' },
+                            ],
+                        },
+                    },
+                }],
+            });
+        }, 0);
+    }
+}
+
+// ============================================================
+// 每日净变化瀑布图（替代热力图，更直观）
+// ============================================================
+function renderWaterfall() {
+    if (charts.waterfall) charts.waterfall.dispose();
+    charts.waterfall = echarts.init(document.getElementById('waterfallChart'));
+
+    const range = getDateRange();
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    document.getElementById('waterfallTitle').textContent = `${cfg.label} · 每日净变化瀑布图`;
+    document.getElementById('waterfallSubtitle').textContent =
+        `每个柱子 = 该交易日所有标的的${cfg.label}净变化总和（亿元/亿份/%）。红柱=净流入，绿柱=净流出。` +
+        `鼠标悬停查看明细。范围: ${range[0]} ~ ${range[range.length-1]}。`;
+
+    // 每日净变化（当前指标）
+    const seriesData = [];
+    for (let i = 1; i < range.length; i++) {
+        const d = range[i];
+        const prev = range[i - 1];
+        let dailyChange = 0;
+        const targetDetails = [];
+        for (const t of filteredTargets) {
+            const cur = rawData.records[d]?.[t]?.[currentMetric];
+            const pre = rawData.records[prev]?.[t]?.[currentMetric];
+            if (cur !== null && cur !== undefined && pre !== null && pre !== undefined) {
+                const ch = cur - pre;
+                dailyChange += ch;
+                targetDetails.push({ target: t, change: ch, from: pre, to: cur });
+            }
+        }
+        // 按变化绝对值排序
+        targetDetails.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+        seriesData.push({
+            date: d,
+            value: dailyChange,
+            details: targetDetails,
+        });
+    }
+
+    const dates = seriesData.map(s => s.date);
+    const values = seriesData.map(s => s.value);
+    const colors = values.map(v => v > 0 ? '#e74c3c' : (v < 0 ? '#27ae60' : '#999'));
+
+    // 计算 Y 轴范围（对称）
+    const maxAbs = Math.max(...values.map(Math.abs)) * 1.1;
+
+    charts.waterfall.setOption({
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+                const idx = params[0].dataIndex;
+                const item = seriesData[idx];
+                const sign = item.value > 0 ? '+' : '';
+                const color = item.value > 0 ? '#e74c3c' : '#27ae60';
+                let html = `<b>${item.date}</b><br>
+                    合计净变化: <b style="color:${color}">${sign}${item.value.toFixed(2)} ${cfg.unit}</b><br>
+                    <hr style="margin:4px 0;border:none;border-top:1px solid #eee;">
+                    <div style="max-height:280px;overflow-y:auto;">`;
+                item.details.slice(0, 15).forEach(d => {
+                    const dSign = d.change > 0 ? '+' : '';
+                    const dColor = d.change > 0 ? '#e74c3c' : '#27ae60';
+                    html += `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;">
+                        <span>${d.target}</span>
+                        <span style="color:${dColor};font-weight:600">${dSign}${d.change.toFixed(2)} ${cfg.unit}</span>
+                    </div>`;
+                });
+                if (item.details.length > 15) {
+                    html += `<div style="font-size:10px;color:#999;margin-top:4px;">... 等共 ${item.details.length} 个标的</div>`;
+                }
+                html += `</div>`;
+                return html;
+            }
+        },
+        grid: { left: 80, right: 30, top: 30, bottom: 60 },
+        xAxis: {
+            type: 'category',
+            data: dates,
+            axisLabel: { fontSize: 10, formatter: v => v.length === 7 ? v : v.substring(5) },
+        },
+        yAxis: {
+            type: 'value',
+            name: `日净变化(${cfg.unit})`,
+            nameTextStyle: { fontSize: 11 },
+            axisLabel: {
+                fontSize: 10,
+                formatter: v => v.toFixed(1) + ' ' + cfg.unit,
+            },
+            min: -maxAbs,
+            max: maxAbs,
+        },
+        dataZoom: [
+            { type: 'inside' },
+            { type: 'slider', height: 18, bottom: 25, textStyle: { color: '#666', fontSize: 10, formatter: (v, vs) => `${vs}  (${cfg.unit})` } },
+        ],
+        series: [{
+            name: '净变化',
+            type: 'bar',
+            data: values.map((v, i) => ({
+                value: v,
+                itemStyle: { color: colors[i] }
+            })),
+            barMaxWidth: 22,
+            label: {
+                show: values.length <= 30,  // 太多柱子时不显示标签
+                position: 'top',
+                formatter: p => {
+                    const v = p.value;
+                    if (Math.abs(v) < maxAbs * 0.05) return '';  // 太小不显示
+                    return (v > 0 ? '+' : '') + v.toFixed(0);
+                },
+                fontSize: 9,
+                color: '#555',
+            },
+        }],
+    }, true);
+}
+
+// ============================================================
+// 详细数据表 (with Sparkline)
+// ============================================================
+function renderTable() {
+    const range = getDateRange();
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    // 计算每个标的的统计
+    const stats = [];
+    for (const t of filteredTargets) {
+        const series = getTargetSeries(t, currentMetric);
+        const firstItem = series[0];
+        const lastItem = series[series.length - 1];
+        if (!firstItem || !lastItem || firstItem.value === null || lastItem.value === null) continue;
+
+        const cumulativeChange = lastItem.value - firstItem.value;
+        const changePct = firstItem.value !== 0 ? (cumulativeChange / firstItem.value * 100) : 0;
+        const lastChange = lastItem.change;
+        const lastChangePct = lastItem.changePct;
+
+        // 计算期内最大单日变化
+        let maxDailyChange = 0, minDailyChange = 0;
+        for (const s of series) {
+            if (s.change !== null) {
+                if (s.change > maxDailyChange) maxDailyChange = s.change;
+                if (s.change < minDailyChange) minDailyChange = s.change;
+            }
+        }
+
+        stats.push({
+            target: t,
+            latest: lastItem.value,
+            cumulativeChange,
+            changePct,
+            lastChange,
+            lastChangePct,
+            maxDailyChange,
+            minDailyChange,
+            series,
+            color: TARGET_COLORS[t] || '#999',
+        });
+    }
+
+    // 排序
+    stats.sort((a, b) => {
+        let va = a[tableSortKey], vb = b[tableSortKey];
+        if (va === null || va === undefined) va = -Infinity;
+        if (vb === null || vb === undefined) vb = -Infinity;
+        if (tableSortDir === 'asc') return va - vb;
+        return vb - va;
+    });
+
+    // 表头
+    const head = document.getElementById('tableHead');
+    head.innerHTML = `
+        <tr>
+            <th data-sort="target" style="cursor:pointer;">标的 ${tableSortKey === 'target' ? (tableSortDir === 'asc' ? '↑' : '↓') : ''}</th>
+            <th data-sort="latest" style="cursor:pointer;">最新 ${cfg.short} ${tableSortKey === 'latest' ? (tableSortDir === 'asc' ? '↑' : '↓') : ''}</th>
+            <th data-sort="lastChange" style="cursor:pointer;">日变化 ${tableSortKey === 'lastChange' ? (tableSortDir === 'asc' ? '↑' : '↓') : ''}</th>
+            <th data-sort="lastChangePct" style="cursor:pointer;">日变化%</th>
+            <th data-sort="cumulativeChange" style="cursor:pointer;">期内累计 ${tableSortKey === 'cumulativeChange' ? (tableSortDir === 'asc' ? '↑' : '↓') : ''}</th>
+            <th data-sort="changePct" style="cursor:pointer;">期内变化%</th>
+            <th data-sort="maxDailyChange" style="cursor:pointer;">最大单日变化</th>
+            <th data-sort="minDailyChange" style="cursor:pointer;">最大单日赎回</th>
+            <th>趋势(期内)</th>
+        </tr>
+    `;
+
+    // 表行
+    const body = document.getElementById('tableBody');
+    body.innerHTML = '';
+    for (const s of stats) {
+        const tr = document.createElement('tr');
+        const upDown = v => v > 0 ? 'change-up' : (v < 0 ? 'change-down' : 'change-neutral');
+        const sign = v => v > 0 ? '+' : '';
+        const pctSign = v => v > 0 ? '+' : '';
+        const color = TARGET_COLORS[s.target] || '#333';
+
+        const note = TARGET_DATA_NOTES[s.target];
+        tr.innerHTML = `
+            <td class="target-name">
+                <span class="color-dot" style="background:${color}"></span>${s.target}${note ? ' <span title="'+note+'" style="cursor:help;color:#999;font-size:10px;">ⓘ</span>' : ''}
+            </td>
+            <td><b>${s.latest.toFixed(4)}</b></td>
+            <td class="${upDown(s.lastChange)}">${s.lastChange !== null ? sign(s.lastChange) + s.lastChange.toFixed(4) : '--'}</td>
+            <td class="${upDown(s.lastChangePct)}">${s.lastChangePct !== null ? pctSign(s.lastChangePct) + s.lastChangePct.toFixed(2) + '%' : '--'}</td>
+            <td class="${upDown(s.cumulativeChange)}">${sign(s.cumulativeChange)}${s.cumulativeChange.toFixed(2)}</td>
+            <td class="${upDown(s.changePct)}">${pctSign(s.changePct)}${s.changePct.toFixed(2)}%</td>
+            <td class="change-up">${sign(s.maxDailyChange)}${s.maxDailyChange.toFixed(2)}</td>
+            <td class="change-down">${s.minDailyChange.toFixed(2)}</td>
+            <td class="sparkline-cell"><div id="spark_${s.target}" style="width:100%;height:100%;"></div></td>
+        `;
+        body.appendChild(tr);
+    }
+
+    // 表头点击排序
+    head.querySelectorAll('th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (key === 'target') {
+                // 按名称字母排序
+                if (tableSortKey === 'target') {
+                    tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    tableSortKey = 'target';
+                    tableSortDir = 'asc';
+                }
+            } else {
+                if (tableSortKey === key) {
+                    tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    tableSortKey = key;
+                    tableSortDir = 'desc';
+                }
+            }
+            renderTable();
+        });
+    });
+
+    // 渲染 sparkline（先清理旧的）
+    Object.keys(charts).filter(k => k.startsWith('spark_')).forEach(k => {
+        charts[k].dispose();
+        delete charts[k];
+    });
+    for (const s of stats) {
+        setTimeout(() => {
+            const dom = document.getElementById(`spark_${s.target}`);
+            if (!dom) return;
+            const chart = echarts.init(dom);
+            charts[`spark_${s.target}`] = chart;
+            chart.setOption({
+                grid: { left: 0, right: 0, top: 2, bottom: 2 },
+                xAxis: { type: 'category', show: false, data: s.series.map(d => d.date) },
+                yAxis: { type: 'value', show: false, scale: true },
+                tooltip: { show: false },
+                series: [{
+                    type: 'line',
+                    data: s.series.map(d => d.value),
+                    symbol: 'none',
+                    smooth: true,
+                    lineStyle: { width: 1.5, color: s.color },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: s.color + '60' },
+                            { offset: 1, color: s.color + '10' },
+                        ])
+                    },
+                }],
+            });
+        }, 30);
+    }
+}
+
+// ============================================================
+// 详细图表 - 各标的
+// ============================================================
+function renderDetailCharts() {
+    const section = document.getElementById('detailSection');
+    section.innerHTML = '';
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    // 清理旧的 detail chart 实例
+    for (const key in charts) {
+        if (key.startsWith('detail_')) {
+            charts[key].dispose();
+            delete charts[key];
+        }
+    }
+
+    filteredTargets.forEach(t => {
+        const data = getTargetSeries(t, currentMetric);
+        const dataAgg = aggregateByPeriod(data, currentPeriod);
+        const latest = dataAgg[dataAgg.length - 1];
+        const changeVal = latest ? latest.change : null;
+        const badgeClass = changeVal > 0 ? 'badge-up' : (changeVal < 0 ? 'badge-down' : 'badge-neutral');
+        const badgeText = changeVal !== null ? (changeVal > 0 ? `+${changeVal.toFixed(4)}` : (changeVal < 0 ? changeVal.toFixed(4) : '0')) : '--';
+
+        const card = document.createElement('div');
+        card.className = 'chart-card';
+        card.innerHTML = `
+            <div class="chart-title" style="font-size:14px;margin-bottom:8px;">
+                <span style="color:${TARGET_COLORS[t] || '#333'}">${t}</span>
+                <span class="legend-info">
+                    <span class="${changeVal > 0 ? 'up' : (changeVal < 0 ? 'down' : '')}">${badgeText} ${cfg.unit}</span>
+                </span>
+            </div>
+            <div class="chart-container short" id="chart_${t}"></div>
+        `;
+        section.appendChild(card);
+
+        setTimeout(() => {
+            const chartDom = document.getElementById(`chart_${t}`);
+            if (!chartDom) return;
+            const chart = echarts.init(chartDom);
+            charts[`detail_${t}`] = chart;
+            const color = TARGET_COLORS[t] || '#999';
+
+            chart.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        let html = `<b>${params[0].axisValue}</b><br>`;
+                        params.forEach(p => {
+                            if (p.value !== null && p.value !== undefined) {
+                                const sign = p.value > 0 ? '+' : '';
+                                const color = p.value > 0 ? '#e74c3c' : '#27ae60';
+                                html += `${p.marker} ${p.seriesName}: <span style="color:${color}">${sign}${p.value.toFixed(4)}</span> ${cfg.unit}<br>`;
+                            }
+                        });
+                        return html;
+                    }
+                },
+                grid: { left: 65, right: 50, top: 20, bottom: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: dataAgg.map(d => d.date),
+                    axisLabel: { fontSize: 9, formatter: v => v.length === 7 ? v : v.substring(5) },
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: cfg.yAxisName,
+                        nameTextStyle: { fontSize: 9 },
+                        axisLabel: { fontSize: 9 },
+                        position: 'left',
+                    },
+                    {
+                        type: 'value',
+                        name: `变化(${cfg.unit})`,
+                        nameTextStyle: { fontSize: 9 },
+                        axisLabel: { fontSize: 9 },
+                        position: 'right',
+                    },
+                ],
+                dataZoom: [{ type: 'inside', start: 50, textStyle: { color: '#666', fontSize: 10 } }],
+                series: [
+                    {
+                        name: cfg.label,
+                        type: 'line',
+                        smooth: true,
+                        yAxisIndex: 0,
+                        symbol: 'none',
+                        lineStyle: { width: 2, color: color },
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: color + '40' },
+                                { offset: 1, color: color + '05' },
+                            ])
+                        },
+                        data: dataAgg.map(d => d.value),
+                        itemStyle: { color: color },
+                    },
+                    {
+                        name: '变化',
+                        type: 'bar',
+                        yAxisIndex: 1,
+                        barMaxWidth: 8,
+                        data: dataAgg.map(d => d.change),
+                        itemStyle: {
+                            color: function(params) {
+                                return params.value > 0 ? '#e74c3c' : '#27ae60';
+                            }
+                        },
+                    },
+                ],
+            });
+        }, 30);
+    });
+}
+
+// ============================================================
+// 主渲染
+// ============================================================
+function renderAll() {
+    renderKPIs();
+    renderFlowRanking();
+    renderMainChart();
+    renderWaterfall();
+    renderTable();
+    renderDetailCharts();
+    // 统一注册resize处理器
+    ensureResizeHandler();
+}
+
+// ============================================================
+// 导出工具
+// ============================================================
+
+// 通用：触发浏览器下载
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+// 文件名：etf-{指标}-{品类}-{时间戳}
+function buildFilename(parts) {
+    const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    return `etf-${parts.join('-')}-${ts}`;
+}
+
+// 导出 CSV：当前筛选 + 指标下的明细
+function exportCSV() {
+    if (!rawData) {
+        alert('数据尚未加载完成，请稍后再试。');
+        return;
+    }
+    const range = getDateRange();
+    const filteredTargets = getFilteredTargets();
+    const cfg = getMetricConfig();
+
+    if (range.length === 0 || filteredTargets.length === 0) {
+        alert('当前筛选下无可导出的数据。');
+        return;
+    }
+
+    // 表头：日期 + 每个标的的 value + 变化% + 变化量
+    const header = ['日期'];
+    filteredTargets.forEach(t => {
+        header.push(`${t}（${cfg.unit}）`);
+        header.push(`${t}_日变化（${cfg.unit}）`);
+        header.push(`${t}_日变化%`);
+    });
+
+    const rows = [header];
+    for (const d of range) {
+        const row = [d];
+        for (const t of filteredTargets) {
+            const info = rawData.records[d]?.[t];
+            const v = info ? info[currentMetric] : null;
+            row.push(v !== null && v !== undefined ? v.toFixed(6) : '');
+            // 变化量/率
+            const idx = range.indexOf(d);
+            if (idx > 0) {
+                const prev = rawData.records[range[idx - 1]]?.[t];
+                const pv = prev ? prev[currentMetric] : null;
+                if (v !== null && pv !== null) {
+                    const ch = v - pv;
+                    const chPct = pv !== 0 ? (ch / pv * 100) : 0;
+                    row.push(ch.toFixed(6));
+                    row.push(chPct.toFixed(4));
+                } else {
+                    row.push('', '');
+                }
+            } else {
+                row.push('', '');
+            }
+        }
+        rows.push(row);
+    }
+
+    // 转 CSV 字符串（处理引号/逗号）
+    const csv = rows.map(row => row.map(cell => {
+        const s = cell === null || cell === undefined ? '' : String(cell);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(',')).join('\n');
+
+    // 加 UTF-8 BOM 让 Excel 正确识别中文
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+    triggerDownload(blob, `${buildFilename([currentMetric, currentCategory, 'detail'])}.csv`);
+}
+
+// 导出单个图表为 PNG
+function exportChartImage(chartKey) {
+    const chart = charts[chartKey];
+    if (!chart) {
+        alert(`图表 ${chartKey} 不存在或尚未渲染。`);
+        return;
+    }
+    let dataURL;
+    try {
+        dataURL = chart.getDataURL({
+            type: 'png',
+            pixelRatio: 2,        // 高清
+            backgroundColor: '#fff',
+        });
+    } catch (e) {
+        alert('导出失败：' + e.message);
+        return;
+    }
+    // dataURL → Blob → 下载
+    const byteString = atob(dataURL.split(',')[1]);
+    const mimeType = dataURL.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const blob = new Blob([ab], { type: mimeType });
+    const friendlyName = ({
+        flow: '累计净流入排行',
+        heatmap: '强度热图',
+        mainChange: '每日净变化贡献',
+        waterfall: '每日净变化瀑布图',
+    })[chartKey] || chartKey;
+    triggerDownload(blob, `${buildFilename([currentMetric, currentCategory, friendlyName])}.png`);
+}
+
+// 导出所有可见图表为 PNG（顺序下载）
+function exportAllCharts() {
+    const order = [
+        { key: 'flow', label: '累计净流入排行' },
+        { key: 'heatmap', label: '强度热图' },
+        { key: 'mainChange', label: '每日净变化贡献' },
+        { key: 'waterfall', label: '每日净变化瀑布图' },
+    ];
+    let count = 0;
+    for (const { key } of order) {
+        if (charts[key]) {
+            exportChartImage(key);
+            count++;
+        }
+    }
+    if (count === 0) {
+        alert('当前没有可导出的图表。');
+    } else {
+        // 提示用户
+        console.log(`已触发 ${count} 个图表的下载`);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', loadData);
+</script>
+
+</body>
+</html>
