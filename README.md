@@ -5,13 +5,15 @@
 [![数据更新](https://img.shields.io/badge/数据-每日16:40自动更新-blue)](#)
 [![托管平台](https://img.shields.io/badge/托管-GitHub%20Pages-brightgreen)](#)
 [![可视化](https://img.shields.io/badge/可视化-ECharts%205-orange)](#)
-[![数据源](https://img.shields.io/badge/数据源-akshare-purple)](#)
+[![数据源](https://img.shields.io/badge/数据源-交易所%2B新浪-purple)](#)
 
 ---
 
 ## 一、项目简介
 
-本项目每日自动从上海证券交易所和深圳证券交易所抓取 ETF 份额日报，按**标的**汇总（同一指数的不同基金公司产品合并），通过 GitHub Actions 定时更新，并以可交互的 Web 仪表盘展示份额与资产规模（AUM）的历史走势。
+本项目每日自动从上海证券交易所和深圳证券交易所抓取 ETF 份额日报，按**标的**汇总（同一指数的不同基金公司产品合并），净值走新浪财经源，通过 GitHub Actions 定时更新，并以可交互的 Web 仪表盘展示份额与资产规模（AUM）的历史走势。
+
+> **净值口径（v4 彻底版）**：每个标的的净值不再是"单只代表 ETF"，而是该指数**全部成分 ETF 的份额加权综合净值**，并对每只成分独立做拆分（除权）校正，彻底消除了聚合标的在拆分日出现的 -19%~-24% 负跳变。详见 [脚本说明](#41-成分清单与加权净值)。
 
 **核心用途**：
 
@@ -19,7 +21,7 @@
 - 辅助判断"国家队"对宽基指数（如上证50、沪深300、中证A500）的持仓动向
 - 通过强度热图直观看到哪些品类、哪些时段在持续吸金/失血
 
-**线上访问**：[https://digger-yu.github.io/etf/](https://digger-yu.github.io/etf/)
+**线上访问**：[https://lymt95.github.io/etf/](https://lymt95.github.io/etf/)
 
 ---
 
@@ -81,12 +83,12 @@
 
 | 层 | 技术 |
 |---|---|
-| 数据采集 | Python 3.13 + [akshare](https://github.com/akfamily/akshare) |
+| 数据采集 | Python 3.13 + [akshare](https://github.com/akfamily/akshare)（份额走交易所官方源，净值走新浪财经） |
 | 定时任务 | GitHub Actions（每日北京时间 16:40） |
 | 数据格式 | JSON（前端直接 `fetch` 加载，无需后端） |
 | 前端可视化 | 原生 HTML + CSS + JavaScript + [ECharts 5](https://echarts.apache.org/)（CDN 引入） |
 | 部署托管 | GitHub Pages（`docs/` 目录） |
-| 签名 | GPG 签名提交（`-s -S`） |
+| 签名 | GPG 签名提交（`-s`；Actions 提交不签名） |
 
 ---
 
@@ -102,8 +104,10 @@ etf/
 │   └── data/
 │       └── etf_shares.json        # 每日生成的数据文件
 ├── scripts/
-│   ├── fetch_data.py              # 主抓取脚本（上交所+深交所+东财）
+│   ├── fetch_data.py              # 主抓取脚本（上交所+深交所份额 + 新浪净值）
 │   ├── backfill_data.py           # 历史数据回填脚本
+│   ├── target_components.py       # 21 标的精确成分代码清单（单一指数精确锁）
+│   ├── weighted_nav.py            # 成分加权综合净值 + 成分级拆分校正
 │   ├── gen_test_data.py           # 测试数据生成器
 │   └── requirements.txt           # Python 依赖
 ├── .gitignore
@@ -141,10 +145,26 @@ python scripts/backfill_data.py
       "上证50":   { "shares": 628.4843, "nav": 2.7086, "aum": 1702.31 },
       "中证A500": { "shares": 2236.014,  "nav": 0.9502, "aum": 2124.66 }
     }
-  },
-  "_meta": { "silver_note": "..." }
+  }
 }
 ```
+
+其中 `nav` 为成分加权综合净值、`aum` 为成分份额 × 校正后净值求和（单位：亿元）。
+
+### 6.3 核心脚本说明
+
+| 脚本 | 职责 |
+|---|---|
+| `fetch_data.py` | 主抓取：上交所/深交所份额 + 新浪净值 → 按标的加权聚合 → 写 `etf_shares.json` |
+| `backfill_data.py` | 历史回填：`python backfill_data.py 20260709 20261027`，逐日补数据 |
+| `target_components.py` | 21 个标的的**精确成分代码清单**（单一指数精确锁），排除增强/联接/策略变体 |
+| `weighted_nav.py` | 成分加权综合净值 + 成分级拆分校正（作为库被上面两脚本导入） |
+
+> **净值口径说明**：`weighted_nav.py` 中 `aggregate_weighted` 按
+> `nav = Σ(成分份额 × 成分净值) / Σ成分份额` 计算加权综合净值；
+> `adjust_component_splits` 对每只成分独立检测净值腰斩点（单日比值 < 0.6），
+> 修正拆分登记日净值，保证聚合后 aum 在拆分日不出现负跳变。
+> 成分净值缓存写入 `scripts/nav_cache.json`（已在 `.gitignore` 中忽略）。
 
 ### 6.2 前端展示端
 
@@ -178,7 +198,7 @@ python -m http.server 8000
   2. 安装 Python 3.13
   3. 安装依赖
   4. 运行 `fetch_data.py`
-  5. 自动提交 `docs/data/etf_shares.json` 并推送
+  5. 自动提交 `docs/data/etf_shares.json` 并推送（`-s` 签名，Actions 无 GPG 密钥故不加 `-S`）
 
 ### 7.2 GitHub Actions 自动部署 Pages
 
@@ -208,8 +228,9 @@ python -m http.server 8000
 | 决策 | 原因 |
 |---|---|
 | 以"资产规模(AUM)"作为默认主指标 | 同时反映资金流向（份额）和资产价格（净值），视角更全面 |
-| 按代码 + 名称双轨匹配 | 避免简称模糊（如 SSE 中 510050 叫"50ETF"） |
-| 负向关键词过滤 | 排除子分类干扰（如"工业有色"不算"有色金属"） |
+| 净值改用成分加权综合净值 | 单只代表 ETF 无法反映整个指数的净值，聚合标的拆分日会出现负跳变 |
+| 拆分校正下沉到成分级 | 每只成分独立检测除权点，聚合后 aum 天然连续，消除 -19%~-24% 负跳变 |
+| 单一指数精确锁（成分代码反向索引） | 每个标的锁定一个权威指数，只收录其非增强/非联接 ETF，杜绝同名产品串味 |
 | JSON 而非 CSV | 前端是 JS 直接加载，零解析成本 |
 | ECharts 5 via CDN | 无需 npm 构建，仓库体积小、零依赖 |
 | 热图改用"占比(%)"按"该值/当日总规模"计算 | 让大品类自然更显眼，避免每行各自归一化后视觉趋同 |
@@ -224,7 +245,7 @@ python -m http.server 8000
 | 问题 | 现状 |
 |---|---|
 | 白银 ETF | A 股无场内白银 ETF，份额/AUM 为估算值，仅净值可反映真实价格 |
-| akshare 历史净值接口 | `fund_etf_fund_info_em` 只能取最新 NAV，历史 NAV 通过 `fund_etf_fund_info_em` 历史走势接口补齐 |
+| 东方财富反爬 | 东财行情接口对高频/海外 IP 反爬严格，已彻底绕开，净值改走新浪财经源 |
 | akshare 进度条递归 | `tqdm` 与 akshare 内部调用冲突，已通过环境变量 `TQDM_DISABLE=1` 解决 |
 | 数据频率 | 仅交易日 16:40 后更新一次（盘后数据），非实时 |
 | 瀑布图 `dataZoom` 文本 | ✅ 已修复：滑动条 `textStyle.formatter` 添加 `亿元/亿份` 单位提示，避免极端缩放时文本溢出 |
@@ -236,12 +257,12 @@ python -m http.server 8000
 
 详细计划见仓库 Wiki 或本节 TODO 列表。
 
-### 近期（1–2 周）
+### 近期（1–2 周）✅ 已全部完成
 
-- [ ] 在 GitHub 仓库 Settings → Pages 启用 Pages，绑定线上地址
-- [ ] 在仓库 About 区添加简介与线上链接
-- [ ] 添加 `LICENSE`（推荐 MIT）
-- [ ] 添加 PR / Issue 模板
+- [x] 在 GitHub 仓库 Settings → Pages 启用 Pages，绑定线上地址
+- [x] 在仓库 About 区添加简介与线上链接
+- [x] 添加 `LICENSE`（MIT）
+- [x] 添加 PR / Issue 模板
 
 ### 中期（1 个月）
 
@@ -269,7 +290,7 @@ python -m http.server 8000
 4. 推送分支：`git push origin feat/your-feature`
 5. 提交 Pull Request（关联关键词写正文，例如 `Fixes #12`）
 
-> 提交请使用 GPG 签名（`-s -S`），保持与现有提交风格一致。
+> 提交请使用 GPG 签名（`-s -S`），保持与现有提交风格一致（注：GitHub Actions 自动提交只加 `-s`，不加 `-S`）。
 
 ---
 
@@ -283,6 +304,6 @@ python -m http.server 8000
 
 ## 十三、致谢
 
-- 数据来源：[akshare](https://github.com/akfamily/akshare)、上海证券交易所、深圳证券交易所、东方财富
+- 数据来源：[akshare](https://github.com/akfamily/akshare)、上海证券交易所、深圳证券交易所、新浪财经
 - 可视化：[Apache ECharts](https://echarts.apache.org/)
 - 灵感参考：[digger-yu/gold](https://digger-yu.github.io/gold/)
