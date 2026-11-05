@@ -1,17 +1,39 @@
 name: Fetch ETF Data
 
+# 每日抓取沪深 ETF 份额 + 净值，提交 docs/data/etf_shares.json，
+# 然后在同一个 run 内直接部署 GitHub Pages。
+#
+# 关键点：部署不能再依赖 "push 触发另一个 workflow"。
+# 因为本工作流用 GITHUB_TOKEN 提交，GitHub 规定 GITHUB_TOKEN 产生的 push
+# 不会创建新的 workflow run（防递归），所以 pages.yml 永远不会被启动。
+# 把 deploy 步骤放进本文件，抓数与发布就在同一次运行里原子完成。
+
 on:
   schedule:
-    # 北京时间 16:40 = UTC 08:40
+    # 北京时间 16:40 = UTC 08:40（工作日）
     - cron: '40 8 * * 1-5'
   workflow_dispatch: # 支持手动触发
 
+# 抓数需要写仓库，部署 Pages 需要 pages/id-token
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+# 同一 group 串行，避免 schedule 与手动 dispatch 撞车导致 push 被拒 / 部署互相覆盖
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  fetch:
+  update:
+    name: 抓取数据并部署 Pages
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,5 +56,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data/etf_shares.json
+          # 当天数据无变化（节假日 / 未更新）时不产生空提交
           git diff --staged --quiet || git commit -m "Update ETF share data $(date +%Y-%m-%d)" -s
           git push
+
+      # ---------- 以下为原本 pages.yml 的部署步骤 ----------
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传静态资源（docs/ 目录作为站点根）
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
