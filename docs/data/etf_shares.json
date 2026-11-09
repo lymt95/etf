@@ -1,5 +1,5 @@
 {
-  "last_update": "2026-11-06 16:17:22",
+  "last_update": "2026-11-09 19:08:34",
   "records": {
     "2025-05-06": {
       "上证50": {
@@ -39268,6 +39268,113 @@
         "shares": 107.0696,
         "nav": 0.7084,
         "aum": 75.84
+      }
+    },
+    "2026-11-09": {
+      "上证50": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "沪深300": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "中证500": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "中证1000": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "中证A500": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "科创50": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "科创100": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "创业板指": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "深证100": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "国证2000": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "半导体": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "芯片": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "科创芯片": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "科创半导体": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "双创50": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "黄金": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "白银": {
+        "shares": 36.546,
+        "nav": 1.521,
+        "aum": 55.59
+      },
+      "机器人": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "创新药": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "有色金属": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
+      },
+      "光伏": {
+        "shares": 0.0,
+        "nav": null,
+        "aum": 0.0
       }
     }
   },
